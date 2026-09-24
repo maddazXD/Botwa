@@ -1,0 +1,64 @@
+const util = require("util")
+const { exec } = require("child_process")
+
+let handler = async (m) => m
+
+handler.before = async function (m, { sock, isOwner }) {
+  let body = m.body || ""
+
+  if (body.toLowerCase().startsWith("xx ")) {
+    if (!isOwner) return false
+    try {
+      let code = body.slice(3)
+      let r = await eval(`(async()=>{${code}})()`)
+      await sock.sendMessage(
+        m.chat,
+        { text: util.format(typeof r === "string" ? r : util.inspect(r)) },
+        { quoted: m }
+      )
+    } catch (e) {
+      await sock.sendMessage(
+        m.chat,
+        { text: util.format(e) },
+        { quoted: m }
+      )
+    }
+    return true
+  }
+
+  if (body.toLowerCase().startsWith("x ")) {
+    if (!isOwner) return false
+    try {
+      let code = body.slice(2)
+      let r = await eval(code)
+      await sock.sendMessage(
+        m.chat,
+        { text: util.format(typeof r === "string" ? r : util.inspect(r)) },
+        { quoted: m }
+      )
+    } catch (e) {
+      await sock.sendMessage(
+        m.chat,
+        { text: util.format(e) },
+        { quoted: m }
+      )
+    }
+    return true
+  }
+
+  if (body.startsWith("$ ")) {
+    if (!isOwner) return false
+    exec(body.slice(2), async (e, out) => {
+      await sock.sendMessage(
+        m.chat,
+        { text: util.format(e ? e : out) },
+        { quoted: m }
+      )
+    })
+    return true
+  }
+
+  return false
+}
+
+module.exports = handler
