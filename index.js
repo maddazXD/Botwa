@@ -321,8 +321,15 @@ async function startBot() {
           // format @lid, jadi cek juga phoneNumber/lid dan m.senderAlt.
           const matches = (i, jid) =>
             !!jid && (i.id === jid || i.jid === jid || i.phoneNumber === jid || i.lid === jid);
+          // FIX BUG ADMINONLY: sebelumnya dicek `i.admin !== null` — kalau versi
+          // Baileys yang jalan ngasih field admin sebagai `undefined` (bukan
+          // literally `null`) buat member biasa, `undefined !== null` tetap
+          // `true`, jadi SEMUA member (bukan cuma admin) ke-anggap admin dan
+          // lolos block. Sekarang dicek eksplisit nilainya "admin"/"superadmin"
+          // — gak peduli field-nya null ATAU undefined buat non-admin, member
+          // biasa tetap ke-block dengan benar.
           isAdminBypass = p.some(
-            (i) => (matches(i, m.sender) || matches(i, m.senderAlt)) && i.admin !== null
+            (i) => (matches(i, m.sender) || matches(i, m.senderAlt)) && (i.admin === "admin" || i.admin === "superadmin")
           );
         }
         if (!isAdminBypass) return;

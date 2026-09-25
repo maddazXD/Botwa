@@ -122,9 +122,14 @@ module.exports = async (sock, m) => {
         !!jid && (i.id === jid || i.jid === jid || i.phoneNumber === jid || i.lid === jid);
       const isSameParticipant = (i) =>
         matchesJid(i, m.sender) || matchesJid(i, m.senderAlt);
-      m.isAdmin = p.some((i) => isSameParticipant(i) && i.admin !== null);
+      // FIX BUG (sama kayak index.js security gate): `i.admin !== null` salah
+      // kalau Baileys ngasih `undefined` (bukan `null`) buat non-admin —
+      // undefined !== null tetap true, jadi non-admin ikut lolos. Dicek
+      // eksplisit "admin"/"superadmin" biar aman dari dua kemungkinan itu.
+      const isRealAdmin = (i) => i.admin === "admin" || i.admin === "superadmin";
+      m.isAdmin = p.some((i) => isSameParticipant(i) && isRealAdmin(i));
       m.isBotAdmin = p.some(
-        (i) => matchesJid(i, botNumber) && i.admin !== null
+        (i) => matchesJid(i, botNumber) && isRealAdmin(i)
       );
     }
 

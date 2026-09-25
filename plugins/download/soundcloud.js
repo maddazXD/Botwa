@@ -40,12 +40,24 @@ async function resolveClientId() {
     return CLIENT_ID_CACHE;
   }
 
+  // FIX: header sebelumnya cuma User-Agent doang — beberapa CDN/WAF nolak
+  // request yang keliatan bukan dari browser asli (gak ada Accept/
+  // Accept-Language/dst) dan balikin halaman fallback "JavaScript is
+  // disabled" yang gak punya <script src> sama sekali, bikin scriptUrls
+  // selalu kosong. Header di-lengkapin biar lebih mirip request browser.
   const { data: homepage } = await axios.get("https://soundcloud.com/", {
-    headers: { "User-Agent": "Mozilla/5.0" },
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
     timeout: 15000,
   });
 
-  const scriptUrls = [...homepage.matchAll(/src="(https:\/\/a-v2\.sndcdn\.com\/assets\/[^"]+\.js)"/g)].map((m) => m[1]);
+  // Regex diperlonggar: gak lagi ngunci ke domain a-v2.sndcdn.com doang
+  // (SoundCloud kadang pindah versi CDN, mis. a-v2 -> a-v3 dst), dan terima
+  // src pakai single ATAU double quote.
+  const scriptUrls = [...homepage.matchAll(/src=["'](https:\/\/[a-z0-9.-]*sndcdn\.com\/[^"']+\.js)["']/gi)].map((m) => m[1]);
   if (!scriptUrls.length) throw new Error("Gagal menemukan aset SoundCloud (mungkin struktur situsnya berubah).");
 
   // client_id biasanya nempel di salah satu file JS terakhir (bundle utama) —
@@ -53,7 +65,9 @@ async function resolveClientId() {
   for (const scriptUrl of scriptUrls.reverse()) {
     try {
       const { data: js } = await axios.get(scriptUrl, { timeout: 15000 });
-      const match = /client_id\s*[:=]\s*"([a-zA-Z0-9]+)"/.exec(js);
+      // Diperlonggar juga: terima key "client_id" ATAU "clientId", spasi
+      // bebas di sekitar ":"/"=", dan quote tunggal/ganda.
+      const match = /client_?[iI]d\s*[:=]\s*["']([a-zA-Z0-9]{16,})["']/.exec(js);
       if (match) {
         CLIENT_ID_CACHE = match[1];
         CLIENT_ID_CACHED_AT = Date.now();
@@ -64,7 +78,7 @@ async function resolveClientId() {
     }
   }
 
-  throw new Error("Gagal mengekstrak client_id SoundCloud.");
+  throw new Error("Gagal mengekstrak client_id SoundCloud (semua file JS bundle udah dicoba).");
 }
 
 async function resolveTrack(safeUrl) {

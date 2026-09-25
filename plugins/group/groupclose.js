@@ -14,11 +14,18 @@
 // (sama seperti requirement fitur adminonly versi lama).
 const { footer } = require("../../lib/theme");
 
-let handler = async (m, { sock, args, isAdmin, isOwner }) => {
+let handler = async (m, { sock, args, command, prefix, isAdmin, isOwner }) => {
   if (!m.isGroup) return m.reply("❌ Fitur ini hanya untuk grup!");
   if (!isAdmin && !isOwner) return m.reply("🚫 Khusus admin grup!");
 
-  const input = (args[0] || "").toLowerCase();
+  // SIMPLIFIKASI: command "close"/"open" langsung (m.cmd) sekarang jadi cara
+  // utama pakai fitur ini — gak perlu lagi ".groupclose close"/".groupclose
+  // open" yang kepanjangan, cukup ".close"/".open" aja (udah jelas ini
+  // fitur grup dari kategorinya). "groupclose"/"closegroup"/"lockgroup"
+  // masih dipertahankan sebagai alias lama biar gak break kebiasaan lama —
+  // command itu tetep pakai args[0] (close/open) seperti sebelumnya.
+  const directCommand = command === "close" || command === "open" ? command : null;
+  const input = directCommand || (args[0] || "").toLowerCase();
 
   if (!input) {
     const meta = await sock.groupMetadata(m.chat).catch(() => null);
@@ -26,7 +33,7 @@ let handler = async (m, { sock, args, isAdmin, isOwner }) => {
     return m.reply(
       `🔒 *Status Grup*\n\n` +
       `Status: ${isClosed ? "Ditutup 🔒 (hanya admin bisa kirim pesan)" : "Terbuka 🔓 (semua bisa kirim pesan)"}\n\n` +
-      `Gunakan:\n• ${m.cmd} close — tutup grup\n• ${m.cmd} open — buka grup`
+      `Gunakan:\n• ${prefix}close — tutup grup\n• ${prefix}open — buka grup`
     );
   }
 
@@ -47,7 +54,7 @@ let handler = async (m, { sock, args, isAdmin, isOwner }) => {
 };
 
 handler.tags = ["group"];
-handler.help = ["groupclose <close/open>"];
-handler.command = ["groupclose", "closegroup", "lockgroup"];
+handler.help = ["close", "open"];
+handler.command = ["close", "open", "groupclose", "closegroup", "lockgroup"];
 
 module.exports = handler;
