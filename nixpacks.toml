@@ -11,5 +11,16 @@
 [phases.setup]
 nixPkgs = ["nodejs", "ffmpeg"]
 
+# FIX: @itsliaaa/baileys mendeklarasikan jimp@^1.6.1 sebagai peerOptional,
+# padahal seluruh kodebase (lib/myfunction.js, lib/tableImage.js,
+# plugins/converter/hd.js, plugins/tools/resize.js) pakai API jimp v0.22.x
+# (require CommonJS, getBufferAsync, Jimp.MIME_JPEG, loadFont, dst) yang
+# TIDAK kompatibel dengan jimp v1. Jangan upgrade jimp — cukup suruh npm
+# abaikan peer conflict itu lewat --legacy-peer-deps, dipasang eksplisit
+# di sini biar gak gantung ke .npmrc yang mungkin belum ke-copy saat
+# phase install jalan.
+[phases.install]
+cmds = ["npm install --omit=dev --legacy-peer-deps"]
+
 [start]
 cmd = "node index.js"

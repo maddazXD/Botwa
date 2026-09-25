@@ -14,7 +14,7 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY package*.json .npmrc ./
 RUN npm install --omit=dev
 
 COPY . .
