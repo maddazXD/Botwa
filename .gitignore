@@ -1,0 +1,33 @@
+# Dependencies — beda platform (Termux/VPS/Railway) punya arsitektur native
+# module beda, jadi node_modules JANGAN ikut di-commit; install ulang di
+# tiap environment pakai `npm install`.
+node_modules/
+
+# Sesi login WhatsApp — INI KREDENSIAL ASLI. Kalau ke-commit ke repo public,
+# siapapun bisa pakai buat ambil alih/kontrol nomor WA yang di-pair ke bot
+# ini. WAJIB tetap lokal di tiap environment (generate ulang lewat QR/pairing
+# code pas pertama kali run di situ).
+session/
+
+# Database runtime (data user, grup, settings, owner list) — spesifik per
+# instance yang jalan, bukan bagian dari source code.
+database/db.json
+database/db.json.backup
+
+# File temporary hasil download/convert (audio/video sementara sebelum
+# dikirim) — dibuat otomatis saat runtime, gak perlu di-commit.
+tmp/
+
+# Environment variables (API key, dsb kalau nanti dipisah dari config.js)
+.env
+.env.local
+
+# Log files
+*.log
+npm-debug.log*
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

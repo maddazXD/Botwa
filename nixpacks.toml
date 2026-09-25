@@ -1,0 +1,15 @@
+# nixpacks.toml — konfigurasi build eksplisit buat Railway.
+#
+# MASALAH: tanpa file ini, Railway pakai auto-detect Nixpacks default yang
+# cuma nyiapin Node.js doang — TIDAK termasuk ffmpeg. Akibatnya semua
+# fitur yang manggil binary ffmpeg lewat child_process.exec() (reencode
+# video TikTok/Instagram, convert audio YouTube, dll) gagal dengan error
+# "/bin/sh: 1: ffmpeg: not found".
+#
+# FIX: tambahin ffmpeg ke nixPkgs, jadi ke-install di build image sebelum
+# `npm start` dijalankan.
+[phases.setup]
+nixPkgs = ["nodejs", "ffmpeg"]
+
+[start]
+cmd = "node index.js"

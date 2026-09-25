@@ -23,6 +23,7 @@ const { footer } = require("../../lib/theme");
 const { fetchBetabotzDownload } = require("../../lib/betabotzClient");
 const { getYtdlpAudioUrl, getYtdlpVideoUrl, getYtdlpTitle } = require("../../lib/ytdlpClient");
 const { convertViaYtmp3Mobi } = require("../../lib/ytmp3mobiClient");
+const { convertViaConvert1s } = require("../../lib/convert1sClient");
 const { ssyoutubeDownload } = require("../../lib/ssyoutubeClient");
 const { ytdlAuto } = require("../../lib/cantarellaYtClient");
 
@@ -139,11 +140,14 @@ async function downloadAndConvertVideo(sourceUrl, title) {
 }
 
 async function fetchYtmp3(url) {
-  // 1) SUMBER UTAMA: ytmp3.mobi — TERBUKTI WORK & PALING CEPAT di log server
-  //    (16 Sep 2026), makanya dipindah ke urutan pertama. Provider lain di
-  //    bawah SENGAJA DI-COMMENT (bukan dihapus) biar gampang diaktifin lagi
-  //    manual kalau suatu saat ytmp3.mobi down terus — tinggal uncomment
-  //    blok yang mau dipakai.
+  // Fallback chain — dicoba berurutan, lanjut ke provider berikutnya kalau
+  // yang sebelumnya gagal/timeout. Urutan disusun dari yang paling cepat/
+  // reliable ke yang paling lambat, biar rata-rata request tetap cepat.
+  // yt-dlp (dulu ada di sini) SENGAJA TETAP DI-SKIP: binary-nya gak
+  // ke-install di container ini (butuh Python, di-skip lewat .npmrc
+  // ignore-scripts) — bakal selalu gagal kalau diaktifin di sini.
+
+  // 1) ytmp3.mobi
   try {
     const result = await convertViaYtmp3Mobi(url, "mp3");
     console.log(`[YTMP3] ytmp3.mobi dapet URL buat url=${url}`);
@@ -152,80 +156,70 @@ async function fetchYtmp3(url) {
     console.error(`[YTMP3] ytmp3.mobi error buat url=${url}:`, e.message);
   }
 
-  // === PROVIDER DI BAWAH INI DINONAKTIFKAN (comment) — terbukti lambat/gagal ===
-  // === di log server (btch-downloader gak balikin field mp3, ssyoutube 403, ===
-  // === Cantarella/yt-dlp lambat/gagal). Uncomment salah satu/semua kalau    ===
-  // === ytmp3.mobi di atas mulai sering down.                                ===
+  // 2) convert1s.com / ytmp3.gg — provider beda, diporting dari Nimiyo Downloader
+  try {
+    const result = await convertViaConvert1s(url, "mp3");
+    console.log(`[YTMP3] convert1s.com dapet URL buat url=${url}`);
+    return await downloadAndConvertAudio(result.downloadUrl, result.title);
+  } catch (e) {
+    console.error(`[YTMP3] convert1s.com error buat url=${url}:`, e.message);
+  }
 
-  // // 2) btch-downloader (gratis, gak butuh apikey; backend: ymcdn.org)
-  // const original = await fetchYtInfoOriginal(url);
-  // if (original?.mp3) {
-  //   try {
-  //     return await downloadAndConvertAudio(original.mp3, original.title);
-  //   } catch (e) {
-  //     console.error(`[YTMP3] btch-downloader dapet link tapi gagal download buat url=${url}:`, e.message);
-  //   }
-  // }
+  // 3) btch-downloader (gratis, gak butuh apikey; backend: ymcdn.org)
+  try {
+    const original = await fetchYtInfoOriginal(url);
+    if (original?.mp3) {
+      return await downloadAndConvertAudio(original.mp3, original.title);
+    }
+  } catch (e) {
+    console.error(`[YTMP3] btch-downloader error buat url=${url}:`, e.message);
+  }
 
-  // // 3) ssyoutube.com (gratis, gak butuh apikey)
-  // try {
-  //   const result = await ssyoutubeDownload(url);
-  //   if (result.audioUrl) {
-  //     console.log(`[YTMP3] ssyoutube.com (fallback) dapet URL buat url=${url}`);
-  //     return await downloadAndConvertAudio(result.audioUrl, result.title);
-  //   }
-  // } catch (e) {
-  //   console.error(`[YTMP3] ssyoutube.com (fallback) error buat url=${url}:`, e.message);
-  // }
+  // 4) ssyoutube.com (gratis, gak butuh apikey)
+  try {
+    const result = await ssyoutubeDownload(url);
+    if (result.audioUrl) {
+      console.log(`[YTMP3] ssyoutube.com (fallback) dapet URL buat url=${url}`);
+      return await downloadAndConvertAudio(result.audioUrl, result.title);
+    }
+  } catch (e) {
+    console.error(`[YTMP3] ssyoutube.com (fallback) error buat url=${url}:`, e.message);
+  }
 
-  // // 4) Cantarella multi-provider (ytdlpyton/ytdown.to/savenow/savetube.me) —
-  // //    PALING LAMBAT: 4 backend berurutan, tiap backend timeout 30-60 detik
-  // //    plus sebagian ada polling loop sampai puluhan detik lagi. Ini yang
-  // //    paling nyumbang proses lama pas provider di atas gagal semua.
-  // try {
-  //   const result = await ytdlAuto(url, "audio");
-  //   if (result?.status && result?.download_url) {
-  //     console.log(`[YTMP3] Cantarella multi-provider (fallback) dapet URL buat url=${url}`);
-  //     return await downloadAndConvertAudio(result.download_url, result.title);
-  //   }
-  // } catch (e) {
-  //   console.error(`[YTMP3] Cantarella multi-provider (fallback) error buat url=${url}:`, e.message);
-  // }
+  // 5) Cantarella multi-provider (ytdlpyton/ytdown.to/savenow/savetube.me) —
+  //    PALING LAMBAT: beberapa backend berurutan, ditaruh paling akhir
+  //    (sebelum BetaBotz) biar gak nunggu lama kalau provider cepat di atas
+  //    udah berhasil duluan.
+  try {
+    const result = await ytdlAuto(url, "audio");
+    if (result?.status && result?.download_url) {
+      console.log(`[YTMP3] Cantarella multi-provider (fallback) dapet URL buat url=${url}`);
+      return await downloadAndConvertAudio(result.download_url, result.title);
+    }
+  } catch (e) {
+    console.error(`[YTMP3] Cantarella multi-provider (fallback) error buat url=${url}:`, e.message);
+  }
 
-  // // 5) yt-dlp — SELALU GAGAL di container ini (binary yt-dlp gak ke-install
-  // //    krn postinstall butuh Python & sengaja di-skip lewat .npmrc
-  // //    ignore-scripts). Baru worth diaktifin lagi kalau Python+binary yt-dlp
-  // //    udah tersedia di container.
-  // try {
-  //   const audioUrl = await getYtdlpAudioUrl(url);
-  //   const title = await getYtdlpTitle(url);
-  //   console.log(`[YTMP3] yt-dlp (fallback) dapet URL buat url=${url}`);
-  //   return await downloadAndConvertAudio(audioUrl, title);
-  // } catch (e) {
-  //   console.error(`[YTMP3] yt-dlp (fallback) error buat url=${url}:`, e.message);
-  // }
-
-  // // 6) BetaBotz (apikey) — fallback terakhir sebelum nyerah total.
-  // try {
-  //   const result = await fetchBetabotzDownload("/api/download/ytmp3", url);
-  //   console.log(`[YTMP3] hasil BetaBotz (fallback) buat url=${url}:`, JSON.stringify(result)?.slice(0, 500));
-  //   if (result?.mp3) {
-  //     return downloadAndConvertAudio(result.mp3, result.title);
-  //   }
-  // } catch (e) {
-  //   console.error(`[YTMP3] BetaBotz (fallback) error buat url=${url}:`, e.message);
-  // }
+  // 6) BetaBotz (apikey) — fallback terakhir sebelum nyerah total.
+  try {
+    const result = await fetchBetabotzDownload("/api/download/ytmp3", url);
+    console.log(`[YTMP3] hasil BetaBotz (fallback) buat url=${url}:`, JSON.stringify(result)?.slice(0, 500));
+    if (result?.mp3) {
+      return downloadAndConvertAudio(result.mp3, result.title);
+    }
+  } catch (e) {
+    console.error(`[YTMP3] BetaBotz (fallback) error buat url=${url}:`, e.message);
+  }
 
   console.error(`[YTMP3 GAGAL] semua sumber gagal buat url=${url}`);
   throw new Error("Video ini gak bisa diproses lewat semua sumber yang tersedia (kemungkinan age-restricted/private/region-locked).");
 }
 
 async function fetchYtmp4(url) {
-  // 1) SUMBER UTAMA: ytmp3.mobi (mode mp4) — dipindah ke urutan pertama sama
-  //    kayak fetchYtmp3, dengan asumsi backend yang sama juga bakal lebih
-  //    cepat/reliable buat video. Provider lain di bawah DI-COMMENT (bukan
-  //    dihapus) — tinggal uncomment kalau ytmp3.mobi mulai sering down buat
-  //    request video.
+  // Fallback chain — sama pola/urutan kayak fetchYtmp3 di atas. yt-dlp
+  // SENGAJA TETAP DI-SKIP (lihat catatan di fetchYtmp3).
+
+  // 1) ytmp3.mobi (mode mp4)
   try {
     const result = await convertViaYtmp3Mobi(url, "mp4");
     console.log(`[YTMP4] ytmp3.mobi dapet URL buat url=${url}`);
@@ -234,61 +228,57 @@ async function fetchYtmp4(url) {
     console.error(`[YTMP4] ytmp3.mobi error buat url=${url}:`, e.message);
   }
 
-  // === PROVIDER DI BAWAH INI DINONAKTIFKAN (comment) — sama alasannya kayak ===
-  // === di fetchYtmp3 di atas. Uncomment kalau perlu.                        ===
+  // 2) convert1s.com / ytmp3.gg — provider beda, diporting dari Nimiyo Downloader
+  try {
+    const result = await convertViaConvert1s(url, "mp4");
+    console.log(`[YTMP4] convert1s.com dapet URL buat url=${url}`);
+    return await downloadAndConvertVideo(result.downloadUrl, result.title);
+  } catch (e) {
+    console.error(`[YTMP4] convert1s.com error buat url=${url}:`, e.message);
+  }
 
-  // // 2) btch-downloader (gratis, gak butuh apikey; backend: ymcdn.org)
-  // const original = await fetchYtInfoOriginal(url);
-  // if (original?.link) {
-  //   try {
-  //     return await downloadAndConvertVideo(original.link, original.title);
-  //   } catch (e) {
-  //     console.error(`[YTMP4] btch-downloader dapet link tapi gagal download buat url=${url}:`, e.message);
-  //   }
-  // }
+  // 3) btch-downloader (gratis, gak butuh apikey; backend: ymcdn.org)
+  try {
+    const original = await fetchYtInfoOriginal(url);
+    if (original?.link) {
+      return await downloadAndConvertVideo(original.link, original.title);
+    }
+  } catch (e) {
+    console.error(`[YTMP4] btch-downloader error buat url=${url}:`, e.message);
+  }
 
-  // // 3) ssyoutube.com (gratis, gak butuh apikey)
-  // try {
-  //   const result = await ssyoutubeDownload(url);
-  //   if (result.videoUrl) {
-  //     console.log(`[YTMP4] ssyoutube.com (fallback) dapet URL buat url=${url}`);
-  //     return await downloadAndConvertVideo(result.videoUrl, result.title);
-  //   }
-  // } catch (e) {
-  //   console.error(`[YTMP4] ssyoutube.com (fallback) error buat url=${url}:`, e.message);
-  // }
+  // 4) ssyoutube.com (gratis, gak butuh apikey)
+  try {
+    const result = await ssyoutubeDownload(url);
+    if (result.videoUrl) {
+      console.log(`[YTMP4] ssyoutube.com (fallback) dapet URL buat url=${url}`);
+      return await downloadAndConvertVideo(result.videoUrl, result.title);
+    }
+  } catch (e) {
+    console.error(`[YTMP4] ssyoutube.com (fallback) error buat url=${url}:`, e.message);
+  }
 
-  // // 4) Cantarella multi-provider — PALING LAMBAT (lihat catatan di fetchYtmp3).
-  // try {
-  //   const result = await ytdlAuto(url, "720");
-  //   if (result?.status && result?.download_url) {
-  //     console.log(`[YTMP4] Cantarella multi-provider (fallback) dapet URL buat url=${url}`);
-  //     return await downloadAndConvertVideo(result.download_url, result.title);
-  //   }
-  // } catch (e) {
-  //   console.error(`[YTMP4] Cantarella multi-provider (fallback) error buat url=${url}:`, e.message);
-  // }
+  // 5) Cantarella multi-provider — PALING LAMBAT (lihat catatan di fetchYtmp3).
+  try {
+    const result = await ytdlAuto(url, "720");
+    if (result?.status && result?.download_url) {
+      console.log(`[YTMP4] Cantarella multi-provider (fallback) dapet URL buat url=${url}`);
+      return await downloadAndConvertVideo(result.download_url, result.title);
+    }
+  } catch (e) {
+    console.error(`[YTMP4] Cantarella multi-provider (fallback) error buat url=${url}:`, e.message);
+  }
 
-  // // 5) yt-dlp — SELALU GAGAL di container ini (lihat catatan di fetchYtmp3).
-  // try {
-  //   const videoUrl = await getYtdlpVideoUrl(url);
-  //   const title = await getYtdlpTitle(url);
-  //   console.log(`[YTMP4] yt-dlp (fallback) dapet URL buat url=${url}`);
-  //   return await downloadAndConvertVideo(videoUrl, title);
-  // } catch (e) {
-  //   console.error(`[YTMP4] yt-dlp (fallback) error buat url=${url}:`, e.message);
-  // }
-
-  // // 6) BetaBotz (apikey) — fallback terakhir sebelum nyerah total.
-  // try {
-  //   const result = await fetchBetabotzDownload("/api/download/ytmp4", url);
-  //   console.log(`[YTMP4] hasil BetaBotz (fallback) buat url=${url}:`, JSON.stringify(result)?.slice(0, 500));
-  //   if (result?.mp4) {
-  //     return downloadAndConvertVideo(result.mp4, result.title);
-  //   }
-  // } catch (e) {
-  //   console.error(`[YTMP4] BetaBotz (fallback) error buat url=${url}:`, e.message);
-  // }
+  // 6) BetaBotz (apikey) — fallback terakhir sebelum nyerah total.
+  try {
+    const result = await fetchBetabotzDownload("/api/download/ytmp4", url);
+    console.log(`[YTMP4] hasil BetaBotz (fallback) buat url=${url}:`, JSON.stringify(result)?.slice(0, 500));
+    if (result?.mp4) {
+      return downloadAndConvertVideo(result.mp4, result.title);
+    }
+  } catch (e) {
+    console.error(`[YTMP4] BetaBotz (fallback) error buat url=${url}:`, e.message);
+  }
 
   console.error(`[YTMP4 GAGAL] semua sumber gagal buat url=${url}`);
   throw new Error("Video ini gak bisa diproses lewat semua sumber yang tersedia (kemungkinan age-restricted/private/region-locked).");

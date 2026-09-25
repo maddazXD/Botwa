@@ -62,7 +62,7 @@ let handler = async (m, { sock, text, prefix, command }) => {
   }
 };
 
-handler.command = ["pinsearch", "pinterest"];
+handler.command = ["pinsearch"];
 handler.help = [`pinsearch <kata kunci>|<jumlah opsional> (cari gambar di Pinterest, default ${DEFAULT_RESULTS})`];
 handler.tags = ["tools"];
 

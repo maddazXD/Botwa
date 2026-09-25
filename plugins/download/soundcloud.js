@@ -68,12 +68,36 @@ async function resolveClientId() {
 }
 
 async function resolveTrack(safeUrl) {
-  const clientId = await resolveClientId();
+  let clientId = await resolveClientId();
 
-  const { data: track } = await axios.get("https://api-v2.soundcloud.com/resolve", {
-    params: { url: safeUrl, client_id: clientId },
-    timeout: 15000,
-  });
+  async function tryResolve(id) {
+    return axios.get("https://api-v2.soundcloud.com/resolve", {
+      params: { url: safeUrl, client_id: id },
+      timeout: 15000,
+      validateStatus: () => true, // biar bisa baca body error 401/403/404 manual
+    });
+  }
+
+  let res = await tryResolve(clientId);
+
+  // 401/403 dari endpoint ini biasanya artinya client_id yang di-scrape udah
+  // gak valid (SoundCloud rotate client_id) — bukan berarti track/link-nya
+  // salah. Coba refresh sekali (paksa scrape ulang, abaikan cache) sebelum
+  // nyerah.
+  if (res.status === 401 || res.status === 403) {
+    CLIENT_ID_CACHE = null;
+    clientId = await resolveClientId();
+    res = await tryResolve(clientId);
+  }
+
+  if (res.status === 404) {
+    throw new Error("Track tidak ditemukan (link mungkin salah/private/sudah dihapus).");
+  }
+  if (res.status !== 200) {
+    throw new Error(`SoundCloud API mengembalikan status ${res.status} (client_id mungkin invalid).`);
+  }
+
+  const track = res.data;
 
   if (!track || track.kind !== "track") {
     throw new Error("Link ini bukan track SoundCloud yang valid (mungkin playlist/user, coba link track langsung).");
