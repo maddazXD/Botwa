@@ -37,6 +37,10 @@ handler.before = async (m, { sock, isAdmin, isOwner, isBotAdmin }) => {
     await sock.sendMessage(m.chat, {
       delete: { remoteJid: m.chat, fromMe: false, id: m.key.id, participant: m.sender },
     });
+    // LOG DIAGNOSTIK: biar kalau ada laporan "pesan kehapus sendiri, gak
+    // tau kenapa" ke depannya, tinggal cek log Railway — ketauan LANGSUNG
+    // plugin mana yang micu, bukan nebak-nebak dari gejala di WA lagi.
+    console.log(`[ANTITOXIC] Hapus pesan dari ${m.sender} di grup ${m.chat} — alasan: kata toxic terdeteksi.`);
     await sock.sendMessage(
       m.chat,
       { text: `*– 乂 Anti Toxic –*\n\n⚠️ Pesan dari @${m.sender.split("@")[0]} mengandung kata toxic dan telah dihapus.`, mentions: [m.sender] },

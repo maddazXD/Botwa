@@ -34,6 +34,7 @@ handler.before = async (m, { sock, isAdmin, isOwner, isBotAdmin }) => {
     await sock.sendMessage(m.chat, {
       delete: { remoteJid: m.chat, fromMe: false, id: m.key.id, participant: m.sender },
     });
+    console.log(`[ANTITAGALL] Hapus pesan dari ${m.sender} di grup ${m.chat} — alasan: mention >= ${maxTag}.`);
     await sock.sendMessage(m.chat, { text: `*– 乂 Anti TagAll –*\nTerlalu banyak mention dalam satu pesan.` }, { quoted: m });
   } catch (e) {
     console.error("[ANTITAGALL GAGAL]", e.message);

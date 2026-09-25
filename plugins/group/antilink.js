@@ -35,6 +35,7 @@ handler.before = async (m, { sock, isAdmin, isOwner, isBotAdmin }) => {
     await sock.sendMessage(m.chat, {
       delete: { remoteJid: m.chat, fromMe: false, id: m.key.id, participant: m.sender },
     });
+    console.log(`[ANTILINK] Hapus pesan dari ${m.sender} di grup ${m.chat} — alasan: link grup WA terdeteksi.`);
     await sock.sendMessage(m.chat, { text: `*– 乂 Anti Link Grup –*\nLink grup WhatsApp tidak diperbolehkan di sini!` }, { quoted: m });
   } catch (e) {
     console.error("[ANTILINK GAGAL]", e.message);

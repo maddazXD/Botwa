@@ -74,9 +74,32 @@ const handler = async (m, { args, command, prefix }) => {
     ];
 
     const lines = fiturList.map((key, index) => `[${index + 1}] ${key} : *${(global[key] || global.db?.settings?.[key]) ? "ON ✅" : "OFF ❌"}*`);
+
+    // FIX: sebelumnya toggle PER-GRUP (antitoxic/antilink/antitagall/
+    // antivirtex, plus jumlah member kena .mute) gak keliatan sama sekali
+    // di sini — padahal ini justru fitur yang paling sering bikin pesan
+    // member ke-hapus tanpa kelihatan alasannya. Sekarang kalau command
+    // ini dipanggil DI DALAM grup, ditambahin blok khusus nunjukin status
+    // fitur grup itu, biar gak perlu nebak/cek log server buat tau kenapa
+    // pesan kehapus.
+    let groupBlock = "";
+    if (m.isGroup) {
+      const chat = global.db.groups?.[m.chat] || {};
+      const mutedCount = Object.keys(chat.mutedMembers || {}).length;
+      const groupLines = [
+        `Anti Toxic : *${chat.antitoxic ? "ON ✅" : "OFF ❌"}*`,
+        `Anti Link : *${chat.antilink ? "ON ✅" : "OFF ❌"}*`,
+        `Anti TagAll : *${chat.antitagall ? "ON ✅" : "OFF ❌"}*`,
+        `Anti Virtex : *${chat.antivirtex ? "ON ✅" : "OFF ❌"}*`,
+        `Member di-mute : *${mutedCount > 0 ? `${mutedCount} orang (cek ${prefix}mutelist)` : "tidak ada"}*`,
+      ];
+      groupBlock = card("FITUR GRUP INI (yang bisa hapus pesan member)", groupLines, "🗑️") + "\n\n";
+    }
+
     const teks =
       `${header("Status Bot", "📊")}\n\n` +
       card("AKSES BOT (siapa boleh pakai)", accessLines, "🔐") + "\n\n" +
+      groupBlock +
       card("INFO", infoLines, "📊") + "\n\n" +
       card("FITUR (toggle)", lines, "⚙️") + "\n\n" +
       `📝 *Cara ubah fitur:*\n› ${prefix}${command} on/off <nomor>\n› ${prefix}self on/off — Self mode\n› ${prefix}adminonly on/off — Admin Only mode\n› ${prefix}public — Public mode\n\n` +

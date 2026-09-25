@@ -96,6 +96,13 @@ handler.before = async (m, { sock, isBotAdmin }) => {
     await sock.sendMessage(m.chat, {
       delete: { remoteJid: m.chat, fromMe: false, id: m.key.id, participant: m.sender },
     });
+    // LOG DIAGNOSTIK: ini SATU-SATUNYA fitur yang hapus pesan TANPA peduli
+    // isinya (command ataupun chat biasa) — jadi kalau ada laporan "semua
+    // pesan dari member ini kehapus, apapun isinya", cek log ini duluan.
+    // Mute permanen (gak ada expiresAt) NEMPEL TERUS sampai di-.unmute
+    // manual, gak ke-reset walau mode bot (public/self/adminonly) diganti —
+    // dua fitur ini sengaja independen satu sama lain.
+    console.log(`[MUTE] Hapus pesan dari ${m.sender} di grup ${m.chat} — sedang di-mute (permanen: ${!muted.expiresAt}).`);
   } catch (e) {}
   return true;
 };

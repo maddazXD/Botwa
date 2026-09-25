@@ -33,6 +33,7 @@ handler.before = async (m, { sock, isAdmin, isOwner, isBotAdmin }) => {
     await sock.sendMessage(m.chat, {
       delete: { remoteJid: m.chat, fromMe: false, id: m.key.id, participant: m.sender },
     });
+    console.log(`[ANTIVIRTEX] Hapus pesan dari ${m.sender} di grup ${m.chat} — alasan: teks terlalu panjang/spam karakter.`);
     await sock.sendMessage(m.chat, { text: `*– 乂 Anti Virtex –*\nPesan terdeteksi sebagai spam / virtex dan telah dihapus.` }, { quoted: m });
   } catch (e) {
     console.error("[ANTIVIRTEX GAGAL]", e.message);
