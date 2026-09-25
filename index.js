@@ -181,7 +181,7 @@ async function startBot() {
   //  ❌ groupStatusMessageV2 → story GC (swgcv2) SENGAJA dikecualikan
   //  ❌ react, delete, edit → dikecualikan (bukan konten chat biasa)
   // ═══════════════════════════════════════════════════════════════════════
-  const AUTO_DELETE_MS = 5 * 60 * 1_000;          // 2 menit
+  const AUTO_DELETE_MS = 5 * 60 * 1_000;          // 5 menit
   const _origSendMessage = sock.sendMessage.bind(sock);
   const _origRelayMsg    = sock.relayMessage.bind(sock);
 
