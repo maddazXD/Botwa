@@ -11,7 +11,16 @@ let handler = async (m, { sock, text }) => {
   await m.reply("⏳ Diproses dulu ya...")
 
   try {
-    const resApi = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(text.trim())}`, { validateStatus: () => true })
+    // FIX 403: tikwm.com nolak request yang gak keliatan kayak dari browser
+    // (gak ada User-Agent/Referer), jadi baliknya HTTP 403 body kosong.
+    // Tambahin header ini biar keliatan legit.
+    const resApi = await axios.get(`https://www.tikwm.com/api/?url=${encodeURIComponent(text.trim())}`, {
+      validateStatus: () => true,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Referer": "https://www.tikwm.com/",
+      },
+    })
     const resData = resApi.data
     console.log(`[TIKTOK DEBUG] status: ${resApi.status}, data:`, JSON.stringify(resData)?.slice(0, 500))
 
