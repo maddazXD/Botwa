@@ -49,9 +49,16 @@ const handler = async (m, { args, command, prefix }) => {
     const bannedCount = (global.db?.settings?.banned || []).length;
     const ramUsed = (process.memoryUsage().rss / 1024 / 1024).toFixed(1);
     const ramTotal = (os.totalmem() / 1024 / 1024 / 1024).toFixed(1);
+    const sleepOn = !!global.sleepMode;
 
+    // FIX: sebelumnya cuma mode bot doang yang keliatan di "INFO", sedangkan
+    // fitur-fitur bot-lebar lain yang juga ngaruh ke "siapa yang dilayani
+    // bot" (Sleep Mode) gak keliatan sama sekali di satu tempat ini — bikin
+    // gak jelas fitur mana yang sedang aktif pas ada lebih dari satu mode
+    // restriktif nyala bareng. Sekarang SEMUA state akses-bot (mode +
+    // sleep mode) ditaro jadi satu blok "AKSES BOT" biar keliatan lengkap
+    // dan gak ambigu fitur mana yang lagi ngatur siapa boleh pakai bot.
     const infoLines = [
-      `Mode bot : *${modeLabel}*`,
       `Prefix : *${activePrefix}*`,
       `Ping : *${pingMs} ms*`,
       `Uptime : *${formatUptime(process.uptime())}*`,
@@ -61,13 +68,20 @@ const handler = async (m, { args, command, prefix }) => {
       `User dibanned : *${bannedCount}*`,
     ];
 
+    const accessLines = [
+      `Mode bot : *${modeLabel}*`,
+      `Sleep Mode : *${sleepOn ? "ON 💤 (cuma owner yang dilayani)" : "OFF ❌"}*`,
+    ];
+
     const lines = fiturList.map((key, index) => `[${index + 1}] ${key} : *${(global[key] || global.db?.settings?.[key]) ? "ON ✅" : "OFF ❌"}*`);
     const teks =
       `${header("Status Bot", "📊")}\n\n` +
+      card("AKSES BOT (siapa boleh pakai)", accessLines, "🔐") + "\n\n" +
       card("INFO", infoLines, "📊") + "\n\n" +
       card("FITUR (toggle)", lines, "⚙️") + "\n\n" +
-      `📝 *Cara ubah fitur:*\n› ${prefix}${command} on/off <nomor>\n\n` +
-      `*Contoh:*\n› ${prefix}${command} on 1\n› ${prefix}${command} off 1 2` +
+      `📝 *Cara ubah fitur:*\n› ${prefix}${command} on/off <nomor>\n› ${prefix}self on/off — Self mode\n› ${prefix}adminonly on/off — Admin Only mode\n› ${prefix}public — Public mode\n\n` +
+      `*Contoh:*\n› ${prefix}${command} on 1\n› ${prefix}${command} off 1 2\n\n` +
+      `ℹ️ Fitur per-grup (mute member, tutup/buka grup) gak masuk sini — cek *${prefix}mutelist* atau *${prefix}close* / *${prefix}open* (tanpa argumen) langsung di grup terkait.` +
       footer();
     return m.reply(teks);
   }

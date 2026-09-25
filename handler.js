@@ -272,6 +272,18 @@ module.exports = async (sock, m) => {
         });
         if (!sentInteractive) m.reply(bodyText);
       }
+
+      // FIX BUG (arsitektural): dulu gak ada `break` di sini — loop tetep
+      // lanjut ngecek SISA plugin lain walau command udah ketemu & DIJALANIN.
+      // Kalau suatu saat ada 2 plugin yang kebetulan daftar command yang
+      // sama (typo copy-paste, alias yang gak sengaja bentrok, dll), KEDUANYA
+      // bakal ke-eksekusi berurutan buat 1 command yang sama — persis gejala
+      // "kayak jalanin 2 perintah sekaligus". Command matching seharusnya
+      // "first match wins", bukan "jalanin semua yang cocok". `break` di sini
+      // + deteksi duplikat command pas plugin di-load (lib/pluginLoader.js)
+      // bikin kelas bug ini gak akan pernah bisa kejadian lagi, disengaja
+      // ataupun gak.
+      break;
     }
 
     // ── Fitur "did you mean" ──────────────
